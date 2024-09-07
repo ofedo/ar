@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+
+<head>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<title></title>
+	<!-- include three.js library -->
+	<script src="three.js/build/three.js"></script>
+	<!-- <script src='js/three.js'></script> -->
+	<!-- include jsartookit -->
+	<!-- <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar.js"></script> -->
+
+	<!-- <script src="jsartoolkit5/artoolkit.min.js"></script>
+	<script src="jsartoolkit5/artoolkit.api.js"></script> -->
+	<!-- include threex.artoolkit -->
+	<!-- <script src="threex/threex-artoolkitsource.js"></script>
+	<script src="threex/threex-artoolkitcontext.js"></script>
+	<script src="threex/threex-arbasecontrols.js"></script>
+	<script src="threex/threex-armarkercontrols.js"></script> -->
+	
+	<script src="AR-js-org/ar-nft.js"></script>
+
+	<script src="d3/d3.v3.min.js"></script>
+
+</head>
+<style>
+	body {
+		background: #000000;
+		color: white;
+		margin: 0;
+		/* height: 100%;
+		width: 100%; */
+		overflow: hidden;
+		cursor: crosshair;
+		font-family: monospace;
+	}
+
+	input {
+		position: absolute;
+		z-index: 1;
+	}
+</style>
+
+<body>
+	<input type="file" id="open-file">
+
+	<script>
+		var scene, camera, renderer, clock, deltaTime, totalTime;
+
+		var arToolkitSource, arToolkitContext;
+
+		var markerRoot1, markerRoot2;
+
+		var mesh1;
+
+		initialize();
+		animate();
+
+		function initialize() {
+
+			scene = new THREE.Scene();
+
+			// let ambientLight = new THREE.AmbientLight(0xcccccc, 0.5);
+			// scene.add(ambientLight);
+
+			camera = new THREE.Camera();
+			camera.position.z = 100;
+			// scene.add(camera);
+
+			renderer = new THREE.WebGLRenderer({
+				antialias: true,
+				alpha: true
+			});
+			// renderer.setClearColor(new THREE.Color('lightgrey'), 0)
+			renderer.setSize(640, 480);
+			renderer.domElement.style.position = 'absolute'
+			renderer.domElement.style.top = '0px'
+			renderer.domElement.style.left = '0px'
+			// renderer.setSize(window.innerWidth, window.innerHeight);
+			// renderer.clear();
+			// renderer.setClearColor(0x000000, 1);
+			// renderer.autoClear = false;
+			// renderer.clear();
+			// scene.fog = new THREE.Fog(0xffffff, 10, 60);
+
+			document.body.appendChild(renderer.domElement);
+
+			clock = new THREE.Clock();
+			deltaTime = 0;
+			totalTime = 0;
+
+			////////////////////////////////////////////////////////////
+			// setup arToolkitSource
+			////////////////////////////////////////////////////////////
+
+			arToolkitSource = new THREEx.ArToolkitSource({
+				sourceType: 'webcam',
+			});
+
+			function onResize() {
+				arToolkitSource.onResize();
+				arToolkitSource.copySizeTo(renderer.domElement);
+				if (arToolkitContext.arController !== null) {
+					arToolkitSource.copySizeTo(arToolkitContext.arController.canvas);
+					window.scrollTo(0, 0);
+				}
+			}
+
+			arToolkitSource.init(function onReady() {
+				onResize();
+			});
+
+			// handle resize event
+			window.addEventListener('resize', function() {
+				onResize();
+			});
+
+			////////////////////////////////////////////////////////////
+			// setup arToolkitContext
+			////////////////////////////////////////////////////////////
+
+			// create atToolkitContext
+			arToolkitContext = new THREEx.ArToolkitContext({
+				cameraParametersUrl: '../ar/data/camera_para.dat',
+				detectionMode: 'mono'
+			});
+
+			// copy projection matrix to camera when initialization complete
+			arToolkitContext.init(function onCompleted() {
+				camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+			});
+
+			////////////////////////////////////////////////////////////
+			// setup markerRoots
+			////////////////////////////////////////////////////////////
+
+			// build markerControls
+			markerRoot1 = new THREE.Group();
+			scene.add(markerRoot1);
+			// scene.rotateX(90);
+			let markerControls1 = new THREEx.ArMarkerControls(arToolkitContext, markerRoot1, {
+				type: 'pattern',
+				// patternUrl: '../ar/data/pattern-najet-painting-eye.patt',
+				patternUrl: '../ar/data/pattern-ccapturecrystal.patt',
+				// type: 'nft',
+				// descriptorsUrl: '../ar/data/pinball/pinball',
+				// descriptorsUrl: '../ar/data/najet-painting-eye-sm',
+				changeMatrixMode: 'cameraTransformMatrix',
+				// changeMatrixMode: 'modelViewMatrix'
+			})
+
+			let geometry1 = new THREE.CubeGeometry(1, 1, 1);
+			let material1 = new THREE.MeshNormalMaterial({
+				// transparent: true,
+				// opacity: 0.5,
+				// side: THREE.DoubleSide
+			});
+			
+			mesh1 = new THREE.Mesh(geometry1, material1);
+			mesh1.position.y = 0.5;
+			// markerRoot1.add(mesh1);
+		}
+
+
+		function update() {
+			// update artoolkit on every frame
+			if (arToolkitSource.ready !== false)
+				arToolkitContext.update(arToolkitSource.domElement);
+		}
+
+
+		function render() {
+			fallback();
+			renderer.render(scene, camera);
+		}
+
+
+		function animate() {
+			requestAnimationFrame(animate);
+			deltaTime = clock.getDelta();
+			totalTime += deltaTime;
+			update();
+			render();
+		}
+
+
+
+		var off = 0;
+		var offAnim = 0;
+		var gain = 40;
+		var audioContext;
+
+		// $(window).load(function() {
+		document.getElementById("open-file").onchange = function(evt) {
+			var file = evt.target.files[0];
+			var reader = new FileReader();
+			reader.onload = function(e) {
+				playSound(e.target.result);
+			}
+			reader.readAsArrayBuffer(file);
+
+			var AudioContext = window.AudioContext || window.webkitAudioContext;
+			audioContext = new AudioContext();
+
+			// capturer.start();
+		}
+
+		function playSound(arraybuffer) {
+			// audioContext.close();
+			// var AudioContext = window.AudioContext || window.webkitAudioContext;
+			// audioContext = new AudioContext();
+
+			var source = audioContext.createBufferSource();
+			audioContext.decodeAudioData(arraybuffer, function(buffer) {
+				source.buffer = buffer;
+			});
+
+			var analyser = audioContext.createAnalyser();
+			analyser.smoothingTimeConstant = 0.3;
+			analyser.fftSize = 1024;
+
+			jsNode = audioContext.createScriptProcessor(2048, 1, 1);
+			jsNode.onaudioprocess = function() {
+				var array = new Uint8Array(analyser.frequencyBinCount);
+				analyser.getByteFrequencyData(array);
+
+				gain = Math.average(array);
+
+			}
+
+			source.connect(analyser);
+			source.connect(audioContext.destination);
+			jsNode.connect(audioContext.destination);
+			analyser.connect(jsNode);
+
+			source.start();
+		}
+
+		Math.average = function(arguments) {
+			var numbers;
+			if (arguments[0] instanceof Array) {
+				numbers = arguments[0];
+			} else if (typeof arguments[0] == "number") {
+				numbers = arguments;
+			}
+			var sum = 0;
+			var average = 0;
+			if (numbers) {
+				for (var i = 0; i < numbers.length; i++) {
+					sum += numbers[i];
+				}
+				average = sum / numbers.length;
+				return average;
+			} else {
+				return 0;
+			}
+		}
+		// });
+
+
+
+		var size = 40;
+		var rangeStep = 7;
+		var off = 0;
+		var offAnim = 0;
+
+		function fallback() {
+			offAnim = gain;
+			off = gain;
+			rangeStep = gain / 10;
+
+			// if (gain < 60) {
+				// renderer.clear();
+			// }
+
+			// camera.position.z = 100 - gain;
+			// scene.fog.color.setHSL(gain, 0.5, 0.5);
+
+			var dataWidth = size;
+			var quasicrystal = combine(d3.range(0, Math.PI, Math.PI / rangeStep).map(wave));
+			for (var z = 0; z < dataWidth / dataWidth; z++) {
+				for (var y = 0; y < dataWidth; y++) {
+					for (var x = 0; x < dataWidth; x++) {
+						var d = quasicrystal(tx(x), ty(y), tz(z));
+						scale = d * 2 * gain / 100; //+Math.sin(off);
+
+						if (markerRoot1.children.length < (dataWidth * dataWidth)) {
+							// geometry2 = new THREE.SphereGeometry(.4, 8, 6);
+							geometry2 = new THREE.CubeGeometry( scale, scale, scale);
+
+							mesh2 = new THREE.Mesh(geometry2,
+								new THREE.MeshBasicMaterial({
+									color: 0xffffff * d,
+									// color: 0xffffff,
+									// wireframe: true,
+									transparent: true,
+									opacity: 0.9
+									// side: THREE.DoubleSide
+								})
+							);
+
+							group = new THREE.Object3D();
+							group.add(mesh2);
+							markerRoot1.add(group);
+
+						} else {
+							group = markerRoot1.children[z * dataWidth + y * dataWidth + x];
+						}
+
+						group.position.x = (x - dataWidth / 2) * d / Math.sin(offAnim);
+						group.position.y = (y - dataWidth / 2) * d / Math.sin(offAnim);
+						group.position.z = (z - dataWidth / 2) * d / Math.sin(offAnim);
+
+						group.rotateX((x - dataWidth / 2) * d);
+						group.rotateY((y - dataWidth / 2) * d);
+						group.rotateZ((z - dataWidth / 2) * d);
+
+						// group.scale.set(scale, scale, scale, scale);
+
+						// group.children[0].material.color.set(
+						// 	new THREE.Color(off * 100));
+					}
+				}
+			}
+
+			function wave(theta) {
+				var c = Math.cos(theta),
+						s = Math.sin(theta),
+						t = Math.PI / Math.cos(theta) * Math.sin(theta);
+						// t = theta;
+				return function(x, y, z) {
+					return (Math.cos(c * x) + Math.cos(s * y) + Math.tan(t * z) + off);
+					// return (Math.cos(c * x + s * y + t * z) + off);
+					// return (Math.cos(c * x - s * y - t * z) + off);
+				};
+			}
+
+			// function wave(theta) {
+			//   var c = Math.cos(theta),
+			//       s = Math.sin(theta);
+			//   return function(x, y) {
+			//     return (Math.cos(c * x - s * y)+ off);
+			//   };
+			// }
+
+			function combine(fs) {
+				var n = fs.length;
+				return function(x, y, z) {
+					var s = 0,
+							i = -1;
+					while (++i < n) {
+						s += fs[i](x, y, z);
+					}
+					var v = s % 1,
+							k = s + v;
+					return (k & 1) === 0 ? v : 1-v;
+				};
+			}
+
+			function tx(x) {
+				return (x - size / 2);
+			}
+
+			function ty(y) {
+				return (y - size / 2);
+			}
+
+			function tz(z) {
+				return (z - size / 2);
+			}
+		}
+	</script>
+
+</body>
+
+</html>
